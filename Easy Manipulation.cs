@@ -1,3 +1,11 @@
+/* Easy Manipulation by Onyx Blackstone
+ *  
+ * Do not edit this script!
+ * All options are available in this PB's Custom Data.
+ * For full manual go to https://github.com/Onyx47/EasyManipulation/wiki
+ * 
+ */
+
 private readonly ArmController _controller;
 private static Program _program;
 

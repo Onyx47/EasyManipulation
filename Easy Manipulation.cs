@@ -1130,7 +1130,7 @@ private class ArmController
             rotor.RotorLock = doLock;
         }
     }
-    
+
     // Redraws any status screens
     public void UpdateDisplays()
     {
@@ -1147,13 +1147,11 @@ private class ArmController
 
             var lineHeight = (screen.SurfaceSize.Y - 10) / 8;
             var textScale = 2.0f;
-            var textHeight = 1.0f;
             var testText = new StringBuilder("O");
 
             while (screen.MeasureStringInPixels(testText, "Debug", textScale).Y > lineHeight)
             {
                 textScale -= 0.1f;
-                textHeight = screen.MeasureStringInPixels(testText, "Debug", textScale).Y;
             }
 
             var groupedJoints = new List<Joint>();
@@ -1176,7 +1174,7 @@ private class ArmController
                 {
                     Type = SpriteType.TEXT,
                     Data = _activeSegment.Name,
-                    Position = position + new Vector2(viewport.Width / 2, 0),
+                    Position = position + new Vector2(viewport.Width / 2, -2),
                     RotationOrScale = textScale,
                     Color = screen.ScriptBackgroundColor,
                     Alignment = TextAlignment.CENTER,
@@ -1207,7 +1205,7 @@ private class ArmController
                     {
                         Type = SpriteType.TEXT,
                         Data = controls[0],
-                        Position = new Vector2(lineHeight, textHeight),
+                        Position = new Vector2(lineHeight, 0),
                         RotationOrScale = textScale,
                         Color = screen.ScriptForegroundColor,
                         Alignment = TextAlignment.CENTER,
@@ -1228,7 +1226,7 @@ private class ArmController
                     {
                         Type = SpriteType.TEXT,
                         Data = controls[1],
-                        Position = new Vector2(lineHeight * 3 + 2, textHeight),
+                        Position = new Vector2(lineHeight * 3 + 2, 0),
                         RotationOrScale = textScale,
                         Color = screen.ScriptForegroundColor,
                         Alignment = TextAlignment.CENTER,
@@ -1239,7 +1237,7 @@ private class ArmController
                     {
                         Type = SpriteType.TEXT,
                         Data = activeSegmentGroup.Name.Replace("_", " "),
-                        Position = new Vector2(lineHeight * 4 + 8, textHeight),
+                        Position = new Vector2(lineHeight * 4 + 8, 0),
                         RotationOrScale = textScale,
                         Color = screen.ScriptForegroundColor,
                         Alignment = TextAlignment.LEFT,
@@ -1282,7 +1280,7 @@ private class ArmController
                     {
                         Type = SpriteType.TEXT,
                         Data = controls[0],
-                        Position = new Vector2(lineHeight, textHeight / 2),
+                        Position = new Vector2(lineHeight, 0),
                         RotationOrScale = textScale,
                         Color = screen.ScriptForegroundColor,
                         Alignment = TextAlignment.CENTER,
@@ -1303,7 +1301,7 @@ private class ArmController
                     {
                         Type = SpriteType.TEXT,
                         Data = controls[1],
-                        Position = new Vector2(lineHeight * 3 + 2, textHeight / 2),
+                        Position = new Vector2(lineHeight * 3 + 2, 0),
                         RotationOrScale = textScale,
                         Color = screen.ScriptForegroundColor,
                         Alignment = TextAlignment.CENTER,
@@ -1314,7 +1312,7 @@ private class ArmController
                     {
                         Type = SpriteType.TEXT,
                         Data = joint.GetBlock().CustomName,
-                        Position = new Vector2(lineHeight * 4 + 8, textHeight / 2),
+                        Position = new Vector2(lineHeight * 4 + 8, 0),
                         RotationOrScale = textScale,
                         Color = screen.ScriptForegroundColor,
                         Alignment = TextAlignment.LEFT,

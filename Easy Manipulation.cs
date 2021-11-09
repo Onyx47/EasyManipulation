@@ -30,6 +30,23 @@ private readonly Dictionary<ControlAxis, List<string>> ControlMap = new Dictiona
     { ControlAxis.Roll, new List<string> {"Q", "E"} }
 };
 
+private enum Mode
+{
+    NormalMode,
+    ToolMode,
+    RestoreMode,
+    PausedMode
+}
+
+private static class ModeNames
+{
+    public const string
+        Normal = "Normal mode",
+        ToolMode = "Tool mode",
+        Restoring = "Moving",
+        Paused = "Paused";
+}
+
 // Global configuration, contains only the tag and index of screen surface to draw to
 public struct GlobalConfiguration
 {
@@ -184,6 +201,12 @@ public class Arm
     {
         var activeSegment = GetSegment(name);
         if(activeSegment == null) return;
+        
+        // Stop the current segment
+        foreach (var joint in ActiveSegment.Joints)
+        {
+            joint.Stop();
+        }
 
         ActiveSegment = activeSegment;
         
@@ -219,7 +242,7 @@ public class ArmSegment
     // Adds a joint to the segment
     public void AddJoint(Joint joint)
     {
-        if (Joints.Contains(joint)) return;
+        if (Joints.Any(j => j.GetBlock() == joint.GetBlock())) return;
 
         var block = joint.GetBlock();
         joint.RelativeDirection =
@@ -335,10 +358,10 @@ public class ArmSegment
         {
             RotorSensitivity = 1.0f,
             RotorMaxSpeed = 10.0f,
-            RotorMaxOffsetFactor = 0.0f,
+            RotorMaxOffsetFactor = 1.0f,
             PistonSensitivity = 10.0f,
             PistonMaxSpeed = 1.0f,
-            PistonMaxOffsetFactor = 0.0f,
+            PistonMaxOffsetFactor = 1.0f,
             UseMouse = true,
             UseUpDown = true,
             UseLeftRight = true,
@@ -434,7 +457,9 @@ public class ArmGroup
 
     public void AddJoint(Joint joint)
     {
-        if (!Joints.Contains(joint)) Joints.Add(joint);
+        if(Joints.Any(j => j.GetBlock() == joint.GetBlock())) return;
+
+        Joints.Add(joint);
     }
 
     public GroupConfiguration GetGroupConfiguration()
@@ -447,10 +472,10 @@ public class ArmGroup
         {
             RotorSensitivity = 1.0f,
             RotorMaxSpeed = 10.0f,
-            RotorMaxOffsetFactor = 0.0f,
+            RotorMaxOffsetFactor = 1.0f,
             PistonSensitivity = 5.0f,
             PistonMaxSpeed = 1.0f,
-            PistonMaxOffsetFactor = 0.0f,
+            PistonMaxOffsetFactor = 1.0f,
             MirrorGroup = false
         };
         
@@ -493,7 +518,7 @@ public class Joint
     private float DesiredValue { get; set; }
     private readonly IMyTerminalBlock Block;
     public int Distance { get; }
-    public float Pose
+    public float Position
     {
         get
         {
@@ -510,7 +535,7 @@ public class Joint
         _arm = arm;
         Distance = distance;
         Block = block;
-        DesiredValue = Pose;
+        DesiredValue = Position;
         
         // Check if this joint already exists
         if (arm.Segments.Select(segment => segment.Value.Joints.Where(c => c.Block == block)).Any(joints => joints.Any()))
@@ -658,18 +683,18 @@ public class Joint
             DesiredValue = MathHelper.Clamp(DesiredValue, block.LowerLimitDeg, block.UpperLimitDeg);
             
             // Don't allow offset higher than the max offset factor
-            if (rotorMaxOffsetFactor > 0 && Math.Abs(Math.Abs(DesiredValue) - Math.Abs(Pose)) >
+            if (rotorMaxOffsetFactor > 0 && Math.Abs(Math.Abs(DesiredValue) - Math.Abs(Position)) >
                 rotorMaxOffsetFactor * rotorMaxSpeed)
             {
-                if (DesiredValue > Pose)
-                    DesiredValue = Pose + rotorMaxOffsetFactor * rotorMaxSpeed;
+                if (DesiredValue > Position)
+                    DesiredValue = Position + rotorMaxOffsetFactor * rotorMaxSpeed;
                 else
-                    DesiredValue = Pose - rotorMaxOffsetFactor * rotorMaxSpeed;
+                    DesiredValue = Position - rotorMaxOffsetFactor * rotorMaxSpeed;
             }
 
             if (!IsAtPosition())
             {
-                var turnAngle = Util.AngleDifference(DesiredValue, Pose);
+                var turnAngle = Util.AngleDifference(DesiredValue, Position);
                 var spinSpeed =
                     MathHelper.Clamp(turnAngle, -Math.Abs(rotorMaxSpeed), Math.Abs(rotorMaxSpeed));
 
@@ -754,7 +779,7 @@ public class Joint
             return Math.Abs(position - ((IMyPistonBase) Block).CurrentPosition) < 0.1;
         
         position = (position + 360) % 360;
-        var currentPosition = (Pose + 360) % 360;
+        var currentPosition = (Position + 360) % 360;
 
         return Math.Abs(Math.Abs(position) - Math.Abs(currentPosition)) <= 0.1;
 
@@ -777,6 +802,47 @@ private class ArmController
     private readonly Dictionary<string, IMyTimerBlock> _timers = new Dictionary<string, IMyTimerBlock>();
     private readonly List<IMyTextSurface> _screens;
     private List<Joint> _manuallyLockedJoints;
+
+    public bool Paused
+    {
+        get { return _manuallyPaused; }
+        set {
+            if(_autoPaused) return;
+            _manuallyPaused = value;
+
+            if (_configuration.PauseLocksJoints)
+            {
+                if (_manuallyPaused)
+                {
+                    _manuallyLockedJoints = GetLockedJoints();
+                    LockAllJoints();    
+                }
+                else
+                {
+                    if (_configuration.PauseLocksJoints)
+                    {
+                        UnlockJoints();
+                    }
+                }
+            }
+        
+            UpdateDisplays();
+        }
+    }
+
+    public bool ToolMode
+    {
+        get { return _toolMode; }
+        set
+        {
+            _toolMode = value;
+            UpdateDisplays();
+        
+            _controller.ControlThrusters = !_toolMode;
+            _controller.ControlWheels = !_toolMode;
+            _controller.SetValueBool("ControlGyros", !_toolMode);
+        }
+    }
 
     public ArmController(GlobalConfiguration configuration, IMyShipController controller)
     {
@@ -887,7 +953,7 @@ private class ArmController
 
                     foreach (var block in group.First().Value)
                     {
-                        if (block == joint.GetBlock()) continue;
+                        // if (block == joint.GetBlock()) continue;
                         
                         foreach (var segment in segments)
                         {
@@ -938,17 +1004,6 @@ private class ArmController
         _activeSegment = _arm.GetSegment(name);
         _arm.SetActiveSegment(name);
         UpdateDisplays();
-    }
-
-    // Toggles tool mode
-    public void SetToolMode(bool enable)
-    {
-        _toolMode = enable;
-        UpdateDisplays();
-        
-        _controller.ControlThrusters = !_toolMode;
-        _controller.ControlWheels = !_toolMode;
-        _controller.SetValueBool("ControlGyros", !_toolMode);
     }
 
     // Get the root joint of the whole arm
@@ -1034,35 +1089,6 @@ private class ArmController
             }
         }
     }
-    
-    // Pauses the control of the arm
-    public void Pause()
-    {
-        if(_manuallyPaused) return;
-        
-        _manuallyPaused = true;
-
-        if (_configuration.PauseLocksJoints)
-        {
-            _manuallyLockedJoints = GetLockedJoints();
-            LockAllJoints();
-        }
-        
-        UpdateDisplays();
-    }
-
-    // Unpauses the control of the arm
-    public void Unpause()
-    {
-        _manuallyPaused = false;
-
-        if (_configuration.PauseLocksJoints)
-        {
-            UnlockJoints();
-        }
-        
-        UpdateDisplays();
-    }
 
     // Call on each update cycle
     public void Update()
@@ -1085,7 +1111,7 @@ private class ArmController
         {
             foreach (var joint in segment.Value.Joints)
             {
-                var value = (float) Math.Round(joint.Pose, 2);
+                var value = (float) Math.Round(joint.Position, 2);
 
                 config.Set($"{_arm.Tag}/Poses/{name}", joint.GetBlock().EntityId.ToString(), value);
                 _poses[name][joint.GetBlock().EntityId] = value;
@@ -1344,11 +1370,15 @@ private class ArmController
                 }
 
                 position = new Vector2(5, 5) + viewport.Position + new Vector2(0, 7 * lineHeight);
-                var controlMode = "Normal mode";
+                var controlMode = ModeNames.Normal;
 
-                if (_toolMode) controlMode = "Tool mode";
-                if (_manuallyPaused) controlMode = "Paused";
-                if (_restoring) controlMode = $"Moving to {_restorePose}";
+                if (ToolMode) controlMode = ModeNames.ToolMode;
+                if (_restoring) controlMode = $"{ModeNames.Restoring} to {_restorePose}";
+                
+                if (Paused)
+                {
+                    controlMode += $", {ModeNames.Paused}";
+                }
 
                 var statusBackground = new MySprite
                 {
@@ -1830,7 +1860,7 @@ public Program()
     _controller.SetActiveSegment("Main");
 
     // Unpause the control
-    _controller.Unpause();
+    _controller.Paused = false;
 
     Runtime.UpdateFrequency = UpdateFrequency.Update1 | UpdateFrequency.Update10;
 }
@@ -1848,31 +1878,66 @@ public void Main(string argument, UpdateType updateSource)
     if ((updateSource & UpdateType.Trigger) == 0 && (updateSource & UpdateType.Terminal) == 0 &&
         (updateSource & UpdateType.Script) == 0 && (updateSource & UpdateType.IGC) == 0) return;
     
-    var command = argument.ToLowerInvariant();
-    var parts = argument.Split(' ');
+    var parts = argument.Split(new [] {' '}, StringSplitOptions.RemoveEmptyEntries);
+    if(parts.Length == 0) return;
+    
+    var command = parts[0].ToLowerInvariant();
     var commandArgument = parts.Length > 1 ? parts[1] : string.Empty;
 
-    if (command.IndexOf("segment ") == 0 && commandArgument != string.Empty)
-        _controller.SetActiveSegment(commandArgument);
-    else if (command.IndexOf("store ") == 0 && commandArgument != string.Empty)
-        _controller.StorePose(commandArgument);
-    else if (command.IndexOf("go ") == 0 && commandArgument != string.Empty)
-        _controller.Go(commandArgument);
-    else if (command.IndexOf("toolmode ") == 0 && commandArgument != string.Empty)
+    Echo($"{command} : {commandArgument}");
+    
+    switch (command)
     {
-        if (commandArgument.ToLower() == "on")
-            _controller.SetToolMode(true);
-        if (commandArgument.ToLower() == "off")
-            _controller.SetToolMode(false);
+        case "segment":
+            if(commandArgument == string.Empty) return;
+            _controller.SetActiveSegment(commandArgument);
+            break;
+        case "store":
+            if(commandArgument == string.Empty) return;
+            _controller.StorePose(commandArgument);
+            break;
+        case "go":
+            if(commandArgument == string.Empty) return;
+            _controller.Go(commandArgument);
+            break;
+        case "toolmode":
+            if(commandArgument == string.Empty) return;
+            switch (commandArgument.ToLowerInvariant())
+            {
+                case "on":
+                    _controller.ToolMode = true;
+                    break;
+                case "off":
+                    _controller.ToolMode = false;
+                    break;
+                case "toggle":
+                    _controller.ToolMode = !_controller.ToolMode;
+                    break;
+            }
+            break;
+        case "pause":
+            if(commandArgument == string.Empty) return;
+            switch (commandArgument.ToLowerInvariant())
+            {
+                case "on":
+                    _controller.Paused = true;
+                    break;
+                case "off":
+                    _controller.Paused = false;
+                    break;
+                case "toggle":
+                    _controller.Paused = !_controller.Paused;
+                    break;
+            }
+            break;
+        case "reload":
+            _controller.ReloadConfiguration();
+            break;
+        case "lock":
+            _controller.ToggleLock(true);
+            break;
+        case "unlock":
+            _controller.ToggleLock(false);
+            break;
     }
-    else if (command == "pause")
-        _controller.Pause();
-    else if (command == "unpause")
-        _controller.Unpause();
-    else if (command == "reload")
-        _controller.ReloadConfiguration();
-    else if (command == "lock")
-        _controller.ToggleLock(true);
-    else if (command == "unlock")
-        _controller.ToggleLock(false);
 }

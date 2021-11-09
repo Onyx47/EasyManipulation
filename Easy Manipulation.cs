@@ -1038,6 +1038,8 @@ private class ArmController
     // Pauses the control of the arm
     public void Pause()
     {
+        if(_manuallyPaused) return;
+        
         _manuallyPaused = true;
 
         if (_configuration.PauseLocksJoints)

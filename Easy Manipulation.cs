@@ -1167,6 +1167,7 @@ private class ArmController
         Update();
     }
 
+    // Toggles rotor locks
     public void ToggleLock(bool doLock)
     {
         var mainGroup = Util.GetMainGroup(_configuration.Tag);
@@ -1502,7 +1503,7 @@ private class ArmController
                     if (joint.ControlAxis == ControlAxis.MovZ)
                         joint.Move(_controller.MoveIndicator.Z, segment.Configuration.InvertWS);
                     if (joint.ControlAxis == ControlAxis.Roll)
-                        joint.Move(_controller.RollIndicator, segment.Configuration.InvertQE);
+                        joint.Move(_controller.RollIndicator,   segment.Configuration.InvertQE);
                 }
             }
             else
@@ -1888,14 +1889,8 @@ public void Main(string argument, UpdateType updateSource)
 {
     if ((updateSource & UpdateType.Update1) != 0) 
         _controller.Update();
-
-    if ((updateSource & UpdateType.Update10) != 0)
-    {
+    else if ((updateSource & UpdateType.Update10) != 0)
         _controller.UpdateDisplays();
-    }
-
-    if ((updateSource & UpdateType.Trigger) == 0 && (updateSource & UpdateType.Terminal) == 0 &&
-        (updateSource & UpdateType.Script) == 0 && (updateSource & UpdateType.IGC) == 0) return;
     
     var parts = argument.Split(new [] {' '}, StringSplitOptions.RemoveEmptyEntries);
     if(parts.Length == 0) return;

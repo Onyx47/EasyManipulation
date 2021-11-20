@@ -1723,10 +1723,11 @@ private static class Util
 private GlobalConfiguration GetGlobalConfiguration()
 {
     var ini = new MyIni();
+    
     var config = Me.CustomData;
-    _program.Storage = config;
 
     if (config == string.Empty || !ini.TryParse(config))
+    {
         return new GlobalConfiguration
         {
             Tag = "Arm",
@@ -1734,18 +1735,16 @@ private GlobalConfiguration GetGlobalConfiguration()
             FastPoseRestore = false,
             PauseLocksJoints = true
         };
-    
-    var sections = new List<string>();
-    ini.GetSections(sections);
+    }
 
-    foreach (var section in sections.Where(section => ini.ContainsKey(section, "Tag") && ini.ContainsKey(section, "UseCockpitScreen")))
+    if(ini.ContainsSection("EasyManipulation"))
     {
         return new GlobalConfiguration
         {
-            Tag = ini.Get(section, "Tag").ToString(),
-            UseCockpitScreen = ini.Get(section, "UseCockpitScreen").ToInt32(),
-            FastPoseRestore = ini.Get(section, "FastPoseRestore").ToBoolean(),
-            PauseLocksJoints = ini.Get(section, "PauseLocksJoints").ToBoolean()
+            Tag                 = ini.Get("EasyManipulation", "Tag").ToString(),
+            UseCockpitScreen    = ini.Get("EasyManipulation", "UseCockpitScreen").ToInt32(),
+            FastPoseRestore     = ini.Get("EasyManipulation", "FastPoseRestore").ToBoolean(),
+            PauseLocksJoints    = ini.Get("EasyManipulation", "PauseLocksJoints").ToBoolean()
         };
     }
 
@@ -1762,15 +1761,15 @@ public Program()
 {
     _program = this;
     var configuration = GetGlobalConfiguration();
-    // Copy custom data to storage for further use
-    Storage = Me.CustomData;
     
     var config = new MyIni();
+    var customData = Me.CustomData;
+    config.TryParse(customData);
 
-    config.Set("EasyManipulation", "Tag", configuration.Tag);
-    config.Set("EasyManipulation", "UseCockpitScreen", configuration.UseCockpitScreen);
-    config.Set("EasyManipulation", "FastPoseRestore", configuration.FastPoseRestore);
-    config.Set("EasyManipulation", "PauseLocksJoints", configuration.PauseLocksJoints);
+    config.Set("EasyManipulation", "Tag",               configuration.Tag);
+    config.Set("EasyManipulation", "UseCockpitScreen",  configuration.UseCockpitScreen);
+    config.Set("EasyManipulation", "FastPoseRestore",   configuration.FastPoseRestore);
+    config.Set("EasyManipulation", "PauseLocksJoints",  configuration.PauseLocksJoints);
 
     // Get any controllers in the main terminal group
     var shipControllers = new List<IMyShipController>();
@@ -1817,36 +1816,36 @@ public Program()
 
     foreach (var segment in arm.Segments.Values)
     {
-        config.Set($"{configuration.Tag}/Segments/{segment.Name}", "RotorSensitivity", segment.Configuration.RotorSensitivity);
-        config.Set($"{configuration.Tag}/Segments/{segment.Name}", "RotorMaxSpeed", segment.Configuration.RotorMaxSpeed);
-        config.Set($"{configuration.Tag}/Segments/{segment.Name}", "RotorMaxOffsetFactor", segment.Configuration.RotorMaxOffsetFactor);
-        config.Set($"{configuration.Tag}/Segments/{segment.Name}", "PistonSensitivity", segment.Configuration.PistonSensitivity);
-        config.Set($"{configuration.Tag}/Segments/{segment.Name}", "PistonMaxSpeed", segment.Configuration.PistonMaxSpeed);
+        config.Set($"{configuration.Tag}/Segments/{segment.Name}", "RotorSensitivity",      segment.Configuration.RotorSensitivity);
+        config.Set($"{configuration.Tag}/Segments/{segment.Name}", "RotorMaxSpeed",         segment.Configuration.RotorMaxSpeed);
+        config.Set($"{configuration.Tag}/Segments/{segment.Name}", "RotorMaxOffsetFactor",  segment.Configuration.RotorMaxOffsetFactor);
+        config.Set($"{configuration.Tag}/Segments/{segment.Name}", "PistonSensitivity",     segment.Configuration.PistonSensitivity);
+        config.Set($"{configuration.Tag}/Segments/{segment.Name}", "PistonMaxSpeed",        segment.Configuration.PistonMaxSpeed);
         config.Set($"{configuration.Tag}/Segments/{segment.Name}", "PistonMaxOffsetFactor", segment.Configuration.PistonMaxOffsetFactor);
-        config.Set($"{configuration.Tag}/Segments/{segment.Name}", "UseMouse", segment.Configuration.UseMouse);
-        config.Set($"{configuration.Tag}/Segments/{segment.Name}", "UseUpDown", segment.Configuration.UseUpDown);
-        config.Set($"{configuration.Tag}/Segments/{segment.Name}", "UseLeftRight", segment.Configuration.UseLeftRight);
-        config.Set($"{configuration.Tag}/Segments/{segment.Name}", "UseWS", segment.Configuration.UseWS);
-        config.Set($"{configuration.Tag}/Segments/{segment.Name}", "UseAD", segment.Configuration.UseAD);
-        config.Set($"{configuration.Tag}/Segments/{segment.Name}", "UseQE", segment.Configuration.UseQE);
-        config.Set($"{configuration.Tag}/Segments/{segment.Name}", "UseCSpace", segment.Configuration.UseCSpace);
-        config.Set($"{configuration.Tag}/Segments/{segment.Name}", "InvertUpDown", segment.Configuration.InvertUpDown);
-        config.Set($"{configuration.Tag}/Segments/{segment.Name}", "InvertLeftRight", segment.Configuration.InvertLeftRight);
-        config.Set($"{configuration.Tag}/Segments/{segment.Name}", "InvertWS", segment.Configuration.InvertWS);
-        config.Set($"{configuration.Tag}/Segments/{segment.Name}", "InvertAD", segment.Configuration.InvertAD);
-        config.Set($"{configuration.Tag}/Segments/{segment.Name}", "InvertQE", segment.Configuration.InvertQE);
-        config.Set($"{configuration.Tag}/Segments/{segment.Name}", "InvertCSpace", segment.Configuration.InvertCSpace);
+        config.Set($"{configuration.Tag}/Segments/{segment.Name}", "UseMouse",              segment.Configuration.UseMouse);
+        config.Set($"{configuration.Tag}/Segments/{segment.Name}", "UseUpDown",             segment.Configuration.UseUpDown);
+        config.Set($"{configuration.Tag}/Segments/{segment.Name}", "UseLeftRight",          segment.Configuration.UseLeftRight);
+        config.Set($"{configuration.Tag}/Segments/{segment.Name}", "UseWS",                 segment.Configuration.UseWS);
+        config.Set($"{configuration.Tag}/Segments/{segment.Name}", "UseAD",                 segment.Configuration.UseAD);
+        config.Set($"{configuration.Tag}/Segments/{segment.Name}", "UseQE",                 segment.Configuration.UseQE);
+        config.Set($"{configuration.Tag}/Segments/{segment.Name}", "UseCSpace",             segment.Configuration.UseCSpace);
+        config.Set($"{configuration.Tag}/Segments/{segment.Name}", "InvertUpDown",          segment.Configuration.InvertUpDown);
+        config.Set($"{configuration.Tag}/Segments/{segment.Name}", "InvertLeftRight",       segment.Configuration.InvertLeftRight);
+        config.Set($"{configuration.Tag}/Segments/{segment.Name}", "InvertWS",              segment.Configuration.InvertWS);
+        config.Set($"{configuration.Tag}/Segments/{segment.Name}", "InvertAD",              segment.Configuration.InvertAD);
+        config.Set($"{configuration.Tag}/Segments/{segment.Name}", "InvertQE",              segment.Configuration.InvertQE);
+        config.Set($"{configuration.Tag}/Segments/{segment.Name}", "InvertCSpace",          segment.Configuration.InvertCSpace);
     }
 
     foreach (var group in arm.Groups.Values)
     {
-        config.Set($"{configuration.Tag}/Groups/{group.Name}", "RotorSensitivity", group.Configuration.RotorSensitivity);
-        config.Set($"{configuration.Tag}/Groups/{group.Name}", "RotorMaxSpeed", group.Configuration.RotorMaxSpeed);
-        config.Set($"{configuration.Tag}/Groups/{group.Name}", "RotorMaxOffsetFactor", group.Configuration.RotorMaxOffsetFactor);
-        config.Set($"{configuration.Tag}/Groups/{group.Name}", "PistonSensitivity", group.Configuration.PistonSensitivity);
-        config.Set($"{configuration.Tag}/Groups/{group.Name}", "PistonMaxSpeed", group.Configuration.PistonMaxSpeed);
-        config.Set($"{configuration.Tag}/Groups/{group.Name}", "PistonMaxOffsetFactor", group.Configuration.PistonMaxOffsetFactor);
-        config.Set($"{configuration.Tag}/Groups/{group.Name}", "MirrorGroup", group.Configuration.MirrorGroup);
+        config.Set($"{configuration.Tag}/Groups/{group.Name}", "RotorSensitivity",          group.Configuration.RotorSensitivity);
+        config.Set($"{configuration.Tag}/Groups/{group.Name}", "RotorMaxSpeed",             group.Configuration.RotorMaxSpeed);
+        config.Set($"{configuration.Tag}/Groups/{group.Name}", "RotorMaxOffsetFactor",      group.Configuration.RotorMaxOffsetFactor);
+        config.Set($"{configuration.Tag}/Groups/{group.Name}", "PistonSensitivity",         group.Configuration.PistonSensitivity);
+        config.Set($"{configuration.Tag}/Groups/{group.Name}", "PistonMaxSpeed",            group.Configuration.PistonMaxSpeed);
+        config.Set($"{configuration.Tag}/Groups/{group.Name}", "PistonMaxOffsetFactor",     group.Configuration.PistonMaxOffsetFactor);
+        config.Set($"{configuration.Tag}/Groups/{group.Name}", "MirrorGroup",               group.Configuration.MirrorGroup);
     }
 
     // Save the home pose
@@ -1883,8 +1882,6 @@ public void Main(string argument, UpdateType updateSource)
     
     var command = parts[0].ToLowerInvariant();
     var commandArgument = parts.Length > 1 ? parts[1] : string.Empty;
-
-    Echo($"{command} : {commandArgument}");
     
     switch (command)
     {

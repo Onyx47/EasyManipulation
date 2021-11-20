@@ -1104,6 +1104,7 @@ private class ArmController
     {
         var config = new MyIni();
         config.TryParse(_controller.CustomData);
+        
         if(!_poses.ContainsKey(name))
             _poses.Add(name, new Dictionary<long, float>());
         
@@ -1133,6 +1134,25 @@ private class ArmController
         foreach (var joint in joints)
         {
             joint.Stop();
+        }
+    }
+
+    // Cancels the current operation
+    public void Cancel()
+    {
+        _stop();
+        _autoUnpause();
+        _restoring = false;
+        
+        var joints = new List<Joint>();
+        foreach (var segmentsValue in _arm.Segments.Values)
+        {
+            joints.AddRange(segmentsValue.Joints);
+        }
+
+        foreach (var joint in joints)
+        {
+            joint.MoveToPosition(joint.Position);
         }
     }
 
@@ -1896,6 +1916,9 @@ public void Main(string argument, UpdateType updateSource)
         case "go":
             if(commandArgument == string.Empty) return;
             _controller.Go(commandArgument);
+            break;
+        case "cancel":
+            _controller.Cancel();
             break;
         case "toolmode":
             if(commandArgument == string.Empty) return;
